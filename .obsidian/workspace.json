@@ -78,7 +78,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 347.5
   },
   "right": {
     "id": "d48725785173eaaa",
@@ -166,7 +166,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 350.5
   },
   "left-ribbon": {
     "hiddenItems": {
@@ -181,8 +181,12 @@
   },
   "active": "0ff59d2a4f6840a6",
   "lastOpenFiles": [
-    "单片机学习笔记/pic/Pasted image 20250723152656.png",
+    "单片机学习笔记/pic/printf串口配置.png",
     "单片机学习笔记/STM32学习笔记.md",
+    "单片机学习笔记/pic/PWM配置.png",
+    "单片机学习笔记/pic/单片机内部温度传感器特性.png",
+    "单片机学习笔记/pic/ADC_DMA配置.png",
+    "单片机学习笔记/pic/Pasted image 20250723152656.png",
     "单片机学习笔记/pic/ADC规则组配置.png",
     "Pasted image 20250723151441.png.md",
     "单片机学习笔记/pic/ADC常规配置.png",

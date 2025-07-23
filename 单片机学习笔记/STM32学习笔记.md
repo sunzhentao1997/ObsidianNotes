@@ -218,9 +218,213 @@ uint8_t Command_GetCommand(uint8_t *command)
 
 ### 1、ADC配置
 ![](pic/ADC规则组配置.png)
-# 二、芯片加密篇
+$\color{red}{Data Alignment：默认数据对其方式为 Right alignment(右对齐)，设置为左对齐需采样时移动数据}$
+$\color{red}{Samling Time：数值越高采样精度越高；一般电压采样13.5左右温度，采样239.5以上。}$
+### 2、DMA配置
+![](pic/ADC_DMA配置.png)
+$\color{red}{数据长度：Half Word 两字节 。ADC分辨率12位，采用Word需要对数据进行拆解}$
+### 3、代码实现
+#### 初始化ADC
+```c
+void DevADC1Func_Init(void)
+{
+	//ADC标定
+	HAL_ADCEx_Calibration_Start(&hadc1);
+	//启动DMA
+	HAL_ADC_Start_DMA(&hadc1, (uint32_t *)ADC1SampleVal, DEV_LEN);
+}
+```
+$\color{red}{由于DMA模式是循环模式，数据会不间断进来}$
+#### ADC采样数据处理
+```c
+void DevADC1Func_Main(void)
+{
+	//计算ADC参考偏差
+	//单片机内部有个精准的1.2V参照电压，可通过参照电压计算参考电压的偏差(温度计算不适用)
+	float gain = ADC1SampleVal[4] * 3.3f / 4095.0f / 1.2f
+	//计算单片机内部温度传感器的采样电压
+	float CoreVol = ADC1SampleVal[3] * 3.3 / 4095.0f / gain
+	//T = ((V25 - Vsense) / Avg_Slope) + 25
+	float CoreTemperature = (1.43 - CoreVol) / 0.0043f + 25.0f;
+}	
+```
+![](pic/单片机内部温度传感器特性.png)
+#### NTC温度传感器查表函数
+```c
+/*
+ *param: u0      NTC当前电阻值
+ *param: bp0[]   对应的电阻值表
+ *param: table[] 对应的温度值表
+ *param: maxIndex-表的最大元素数量
+ *retval: 查表后的温度值
+ */
+float look1_iflf_binlxpw(float u0, const float bp0[], const float table[], uint32_t maxIndex)
+{
+	float frac;
+	uint32_t iRght;
+	uint32_t iLeft;
+	uint32_t bpIdx;
+
+	if (u0 <= bp0[0U])
+	{
+		iLeft = 0U;
+		frac = (u0 - bp0[0U]) / (bp0[1U] - bp0[0U]);
+	}else if (u0 < bp0[maxIndex])
+	{
+		/* Binary Search */
+		bpIdx = maxIndex >> 1U;
+		iLeft = 0U;
+		iRght = maxIndex;
+		while (iRght - iLeft > 1U)
+		{
+			if (u0 < bp0[bpIdx])
+			{
+				iRght = bpIdx;
+			}else
+			{
+				iLeft = bpIdx;
+			}
+			bpIdx = (iRght + iLeft) >> 1U;
+		}
+		frac = (u0 - bp0[iLeft]) / (bp0[iLeft + 1U] - bp0[iLeft]);
+	}else
+	{
+		iLeft = maxIndex - 1U;
+		frac = (u0 - bp0[maxIndex - 1U]) / (bp0[maxIndex] - bp0[maxIndex - 1U]);
+	}
 	
-## ① 获取单片机UID
+	return (table[iLeft + 1U] - table[iLeft]) * frac + table[iLeft];
+}
+```
+
+# 三、定时器PWM输出篇
+
+## ① PWM输出频率占空比动态可调
+
+### 1、定时器配置
+![](pic/PWM配置.png)
+### 2、代码实现
+```c
+
+/*
+* @brief
+* @param pulsetime:脉冲周期时间
+* @param dutycycle:脉冲占空比
+* @retval none
+* @func 调节脉冲时间和占空比
+*/
+
+static uint32_t DevPwm_SetPulseFreq(uint8_t ch,uint32_t pulsetime,uint8_t duty)
+{
+	uint32_t input_freq, out_prescaler_value, out_count_value,pluse;
+	uint32_t channel;
+	TIM_HandleTypeDef *p_handle;
+	
+	channel = dev_ultra_handle[ch].Channel;
+	p_handle = dev_ultra_handle[ch].Handle;
+	input_freq = 10000 / pulsetime;
+	
+	if((input_freq > MAX_OUTPUT_FREQ) || (input_freq < MIN_OUTPUT_FREQ))
+	{
+		return 0;
+	}
+
+	if((input_freq >= 20) && (input_freq <= 10000))
+	{
+		out_prescaler_value = 720-1;
+		out_count_value = 1000000 / input_freq;
+	}else if((input_freq >= 2) && (input_freq < 20))
+	{
+		out_prescaler_value = 7200-1;
+		out_count_value = 100000 / input_freq;
+	}else
+	{
+		return 0;
+	}
+	// 停止定时器
+	HAL_TIM_PWM_Stop(p_handle, channel);
+	HAL_TIM_Base_Stop(p_handle);
+	
+	__HAL_TIM_SET_PRESCALER(p_handle, out_prescaler_value);//更新预分频
+	__HAL_TIM_SetAutoreload(p_handle, out_count_value);    //更新计数周期
+	
+	pluse = out_count_value * duty / 100;                  //计算当前占空比下的脉冲值
+	__HAL_TIM_SetCompare(p_handle, channel, pluse);         
+	// 更新并启动定时器
+	HAL_TIM_Base_Start(p_handle);
+	HAL_TIM_PWM_Start(p_handle, channel);
+	
+	return out_count_value;
+}
+```
+
+# 四、Flash数据循环记录篇
+$\color{red}{**代码实现**}$
+```c
+/*
+ * @ brief 向flash写入数据---以STM32F103为例 
+ * @ param addr  写入地址
+ * @ param buff  写入数据
+ * @ param len   数据长度
+ * @ retval status 写入状态
+ */
+HAL_StatusTypeDef DevFlash_Write(uint32_t addr,uint16_t *buff,uint8_t len)
+{
+	uint8_t tag_i= 0;
+	uint16_t writedata = 0;
+	uint32_t writeaddr = addr;
+	HAL_StatusTypeDef status = HAL_BUSY;
+	//闪存解锁
+	HAL_FLASH_Unlock();
+	
+	for(tag_i = 0;tag_i < len;tag_i++)
+	{
+		writedata = buff[tag_i];
+		status = HAL_FLASH_Program(FLASH_TYPEPROGRAM_HALFWORD, writeaddr, (uint64_t)writedata);
+		if(status != HAL_OK)
+		{
+			HAL_FLASH_Lock();
+			return status;
+		}else
+		{
+			writeaddr += 2;
+		}
+	}
+	//闪存锁定
+	HAL_FLASH_Lock();
+	return status;
+}
+
+/* 
+ * @brief 从flash中读取数据
+ * @param addr  数据读取地址
+ * @param buff  数据缓存区
+ * @param len   数据长度
+ */
+void DevFlash_Read(uint32_t addr,uint16_t* buff,uint16_t len)
+{
+	uint8_t tag_i = 0;
+	uint32_t readaddr = 0;
+	//解锁闪存
+	HAL_FLASH_Unlock();
+	
+	readaddr = addr;
+	for(tag_i = 0;tag_i < len;tag_i++)
+	{
+		*(buff + tag_i) = *(volatile uint32_t *)readaddr;
+		readaddr += 2;
+	}
+	
+	HAL_FLASH_Lock();
+}
+
+```
+
+# 四、算法篇
+	
+## ① MD5加密算法
+
+### 1、获取单片机内部UID
 
 ```c
 uint32_t UID[3] = {0};
@@ -232,10 +436,8 @@ void GetSTM32F103_UID(void)
     UID[2] = HAL_GetUIDw2();
 }
 ```
-
-## ② MD5算法
-
-### MD5.h
+### 2、MD5代码实现
+MD5.h
 ```c
 #ifndef MD5_H
 #define MD5_H
@@ -286,7 +488,8 @@ void MD5Decode(unsigned int *output,unsigned char *input,unsigned int len);
  
 #endif
 ```
-### MD5.c
+
+MD5.c
 ```c
 #include <stdio.h>
 #include <stdlib.h>
@@ -496,5 +699,176 @@ void main( void )
     return;
 }
 ```
+## ② PID控制器算法
 
-[^1]: 
+```c
+#include <stdio.h>
+#include <math.h>
+#include <time.h>
+
+// PID控制器结构体
+typedef struct {
+    // 用户可调参数
+    double Kp;          // 比例增益
+    double Ki;          // 积分增益
+    double Kd;          // 微分增益
+    double tau;         // 微分滤波器时间常数
+    double T;           // 采样时间(s)
+    double out_min;     // 输出下限
+    double out_max;     // 输出上限
+    
+    // 运行状态变量
+    double integral;    // 积分项累积
+    double prev_error;  // 上一次误差
+    double prev_meas;   // 上一次测量值
+    double prev_set;    // 上一次设定值
+    double derivative;  // 滤波后的微分值
+    double output;      // 当前输出值
+    
+    // 设定值平滑参数
+    double set_smooth;  // 设定值平滑因子
+} PIDController;
+
+// 初始化PID控制器
+void PID_Init(PIDController *pid, double Kp, double Ki, double Kd, double T) {
+    pid->Kp = Kp;
+    pid->Ki = Ki;
+    pid->Kd = Kd;
+    pid->T = T;
+    pid->tau = 0.1;         // 默认微分滤波器常数
+    pid->out_min = -100.0;   // 默认输出下限
+    pid->out_max = 100.0;    // 默认输出上限
+    pid->set_smooth = 0.2;   // 默认设定值平滑因子
+    
+    pid->integral = 0.0;
+    pid->prev_error = 0.0;
+    pid->prev_meas = 0.0;
+    pid->prev_set = 0.0;
+    pid->derivative = 0.0;
+    pid->output = 0.0;
+}
+
+// 更新PID控制器状态
+double PID_Update(PIDController *pid, double setpoint, double measurement) {
+    // 1. 设定值平滑处理（防止设定值突变）
+    double smooth_set = pid->set_smooth * setpoint + (1 - pid->set_smooth) * pid->prev_set;
+    pid->prev_set = smooth_set;
+    
+    // 2. 计算误差项
+    double error = smooth_set - measurement;
+    
+    // 3. 比例项
+    double proportional = pid->Kp * error;
+    
+    // 4. 积分项（带抗饱和处理）
+    pid->integral += pid->Ki * error * pid->T;
+    
+    // 积分抗饱和：限制积分累积范围
+    if (pid->integral > pid->out_max) 
+        pid->integral = pid->out_max;
+    else if (pid->integral < pid->out_min) 
+        pid->integral = pid->out_min;
+    
+    // 5. 微分项（带低通滤波）
+    double raw_derivative = (measurement - pid->prev_meas) / pid->T;
+    pid->derivative = (2.0 * pid->Kd * raw_derivative + (2.0 * pid->tau - pid->T) * pid->derivative) /
+                     (2.0 * pid->tau + pid->T);
+    
+    // 6. 计算输出
+    pid->output = proportional + pid->integral - pid->derivative;
+    
+    // 7. 输出限幅
+    if (pid->output > pid->out_max) 
+        pid->output = pid->out_max;
+    else if (pid->output < pid->out_min) 
+        pid->output = pid->out_min;
+    
+    // 8. 保存当前状态
+    pid->prev_error = error;
+    pid->prev_meas = measurement;
+    
+    return pid->output;
+}
+
+// 设置输出限幅
+void PID_SetLimits(PIDController *pid, double min, double max) {
+    pid->out_min = min;
+    pid->out_max = max;
+    
+    // 确保积分项不超出新限幅
+    if (pid->integral > pid->out_max) 
+        pid->integral = pid->out_max;
+    else if (pid->integral < pid->out_min) 
+        pid->integral = pid->out_min;
+}
+
+// 重置控制器状态
+void PID_Reset(PIDController *pid) {
+    pid->integral = 0.0;
+    pid->prev_error = 0.0;
+    pid->prev_meas = 0.0;
+    pid->derivative = 0.0;
+    pid->output = 0.0;
+}
+
+// 示例应用：模拟温度控制系统
+int main() {
+    PIDController temp_pid;
+    
+    // 初始化PID参数：Kp=2.0, Ki=0.5, Kd=1.0, 采样时间0.1s
+    PID_Init(&temp_pid, 2.0, 0.5, 1.0, 0.1);
+    PID_SetLimits(&temp_pid, 0.0, 100.0);  // 输出范围0-100%
+    
+    double setpoint = 50.0;     // 目标温度50°C
+    double temperature = 25.0;  // 当前温度25°C
+    
+    // 模拟100次控制循环
+    for (int i = 0; i < 100; i++) {
+        // 计算控制输出（加热器功率百分比）
+        double output = PID_Update(&temp_pid, setpoint, temperature);
+        
+        // 模拟系统响应（简化的热力学模型）
+        temperature += 0.3 * output - 0.1 * (temperature - 25.0);
+        
+        // 添加随机噪声
+        temperature += ((rand() % 100) / 100.0 - 0.5);
+        
+        printf("Step %d: Set=%.1f, Temp=%.1f, Output=%.1f%%\n", 
+               i+1, setpoint, temperature, output);
+        
+        // 每20步改变一次设定值
+        if (i == 20) setpoint = 60.0;
+        if (i == 60) setpoint = 40.0;
+    }
+    
+    return 0;
+}
+```
+# 五、printf重定向篇
+
+## ① 配置串口
+
+![](pic/printf串口配置.png)
+
+## ② 添加代码
+
+```c
+#include "stdio.h"
+
+#ifdef __GNUC__
+#define PUTCHAR_PROTOTYPE int __io_putchar(int ch)
+#else
+#define PUTCHAR_PROTOTYPE int fputc(int ch, FILE *f)
+#endif
+
+PUTCHAR_PROTOTYPE
+{
+	HAL_UART_Transmit(&huart2, (uint8_t*)&ch,1,HAL_MAX_DELAY);
+    return ch;
+}
+```
+
+## ③ 打印浮点型
+
+	选中项目(右键点击)---> Properties ---> C/C++ Build(下拉) 
+	---> Settings ---> MCU/MPU Settings --->勾选(-u _printf_float)
