@@ -4,16 +4,16 @@
     "type": "split",
     "children": [
       {
-        "id": "e856f8aec4adcca4",
+        "id": "8f74e983ff869fc0",
         "type": "tabs",
         "children": [
           {
-            "id": "55872c731789972e",
+            "id": "8dc8f647bf651e85",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-                "file": "STM32学习笔记/STM32学习笔记.md",
+                "file": "单片机学习笔记/STM32学习笔记.md",
                 "mode": "source",
                 "source": false
               },
@@ -94,7 +94,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "STM32学习笔记/STM32学习笔记.md",
+                "file": "单片机学习笔记/STM32学习笔记.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -113,7 +113,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "STM32学习笔记/STM32学习笔记.md",
+                "file": "单片机学习笔记/STM32学习笔记.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
@@ -142,7 +142,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "STM32学习笔记/STM32学习笔记.md",
+                "file": "单片机学习笔记/STM32学习笔记.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
@@ -179,10 +179,19 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "55872c731789972e",
+  "active": "0ff59d2a4f6840a6",
   "lastOpenFiles": [
-    "STM32学习笔记/STM32学习笔记.md",
-    "STM32学习笔记",
+    "单片机学习笔记/pic/Pasted image 20250723152656.png",
+    "单片机学习笔记/STM32学习笔记.md",
+    "单片机学习笔记/pic/ADC规则组配置.png",
+    "Pasted image 20250723151441.png.md",
+    "单片机学习笔记/pic/ADC常规配置.png",
+    "单片机学习笔记/pic/Pasted image 20250723151441.png",
+    "Pasted image 20250723151441.png",
+    "单片机学习笔记/Pasted image 20250723151441.png",
+    "单片机学习笔记/pic",
+    "单片机学习笔记/新建文件夹",
+    "单片机学习笔记",
     "欢迎.md",
     "新建文件夹"
   ]
