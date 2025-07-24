@@ -359,8 +359,16 @@ static uint32_t DevPwm_SetPulseFreq(uint8_t ch,uint32_t pulsetime,uint8_t duty)
 ```
 
 # 四、Flash数据循环记录篇
+
+## ①  传统Flash操作
 $\color{red}{**代码实现**}$
 ```c
+#define FLASH_SLAVE_START     0x0800F000    //记录数据的起始地址
+#define PAGE_SIZE             2048*2        //记录数据的地址长度
+#define DATA_LENTH            16
+
+uint32_t FlashOffset = 0;
+uint16_t Buff[DATA_LENTH];
 /*
  * @ brief 向flash写入数据---以STM32F103为例 
  * @ param addr  写入地址
@@ -418,10 +426,42 @@ void DevFlash_Read(uint32_t addr,uint16_t* buff,uint16_t len)
 	HAL_FLASH_Lock();
 }
 
+void DevParam_Init()
+{
+	uint32_t read_addr = FLASH_SLAVE_START     //从起始地址开始读数据
+
+	while(read_addr <= (FLASH_SLAVE_START + PAGE_SIZE))
+	{
+		DevFlash_Read(read_addr,Buff,DATA_LENTH);
+		/*轮询查找未写入数据的地址*/
+		if(((uint32_t)Buff[0] << 16 | Buff[1]) != 0xFFFFFFFF)
+		{
+			FlashOffset += (PAGE_SIZE * 2);
+			read_addr = FLASH_SLAVE_START + FlashOffset;
+		}else  /*找到未写入数据的地址后 读取上一次地址的数据(最后一次记录数据的地址)*/
+		{
+		     //Flash第一次写入数据
+			if(read_addr == FLASH_SLAVE_START)
+			{
+				Buff[0] = 0;
+				Buff[1] = 0;    //记录写入次数
+				break;
+			}
+			FlashOffset -= (PAGE_SIZE * 2);
+			read_addr = FLASH_SLAVE_START + FlashOffset;
+			DevFlash_Read(read_addr,Buff,DATA_LENTH);
+			break;
+		}
+	}
+
+}
 ```
 
+## ② FlashDB-超轻量级嵌入式数据库
+
+详细见《[FlashDB移植笔记](FlashDB移植笔记.md)》
 # 四、算法篇
-	
+
 ## ① MD5加密算法
 
 ### 1、获取单片机内部UID
