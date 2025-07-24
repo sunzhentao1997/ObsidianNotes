@@ -191,7 +191,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 200
+    "width": 304.5
   },
   "left-ribbon": {
     "hiddenItems": {
@@ -205,7 +205,7 @@
       "table-editor-obsidian:Advanced Tables Toolbar": false
     }
   },
-  "active": "7763fa97585c5f32",
+  "active": "0ff59d2a4f6840a6",
   "lastOpenFiles": [
     "单片机学习笔记/STM32学习笔记.md",
     "单片机学习笔记/FlashDB移植笔记.md",
