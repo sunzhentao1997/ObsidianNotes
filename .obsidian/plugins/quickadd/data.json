@@ -1,6 +1,13 @@
 {
   "choices": [],
-  "macros": [],
+  "macros": [
+    {
+      "name": "待办",
+      "id": "c64fc4cc-e219-43b5-bd39-5842446c1d25",
+      "commands": [],
+      "runOnStartup": true
+    }
+  ],
   "inputPrompt": "single-line",
   "devMode": false,
   "templateFolderPath": "",

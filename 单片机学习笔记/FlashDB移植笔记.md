@@ -10,7 +10,7 @@
 ![|300](pic/Pasted%20image%2020250724153905.png#pic_center)
 
 ###### ④ 修改配置参数
-1、根据Flash的大小修改"fal_flash_stm32f1_port.c"文件中的参数。
+	1、根据Flash的大小修改"fal_flash_stm32f1_port.c"文件中的参数。
 ```c
 #include <string.h>
 #include <fal.h>
@@ -51,7 +51,7 @@ const struct fal_flash_dev stm32_onchip_flash =
     .write_gran = 32
 };
 ```
-2、在“fal_cfg.h”头文件中定义flash设备表和分区表
+	2、在“fal_cfg.h”头文件中定义flash设备表和分区表
 ```c
 /* ===================== Flash device Configuration ========================= */`
 extern const struct fal_flash_dev stm32f2_onchip_flash;
